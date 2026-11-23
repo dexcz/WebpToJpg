@@ -4,6 +4,7 @@
     <Platform Condition="'$(Platform)' == ''">AnyCPU</Platform>
     <ProjectGuid>{6BB7B269-A455-40BD-A7A7-6DDB631EB66C}</ProjectGuid>
     <OutputType>WinExe</OutputType>
+    <ApplicationIcon>Assets\WebpToJpg.ico</ApplicationIcon>
     <RootNamespace>WebpToJpg</RootNamespace>
     <AssemblyName>WebpToJpg</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
@@ -21,6 +22,10 @@
     <Optimize>true</Optimize>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Assets\WebpToJpg.ico">
+      <LogicalName>WebpToJpg.WebpToJpg.ico</LogicalName>
+    </EmbeddedResource>
+    <None Include="Assets\WebpToJpg.png" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />

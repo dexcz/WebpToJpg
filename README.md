@@ -1,5 +1,7 @@
 # WebP to JPG
 
+<img src="Assets/WebpToJpg.png" width="96" height="96" alt="Landscape photo with an orange conversion arrow">
+
 WebP to JPG is a Windows desktop app for converting batches of WebP images to JPEG. Drag files into the window, choose the JPEG quality, and convert them locally.
 
 ## Build and run

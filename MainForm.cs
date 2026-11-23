@@ -27,6 +27,7 @@ namespace WebpToJpg
         public MainForm()
         {
             Text = "WebP → JPG";
+            Icon = new Icon(typeof(MainForm), "WebpToJpg.ico");
             Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(790, 500);
