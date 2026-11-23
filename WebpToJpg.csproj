@@ -35,6 +35,10 @@
     <Compile Include="Program.cs" />
     <Compile Include="MainForm.cs" />
     <Compile Include="JpegConverter.cs" />
+    <Compile Include="WebpConverter.cs" />
+    <Content Include="Tools\WebP\cwebp.exe;Tools\WebP\COPYING.txt;Tools\WebP\PATENTS.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

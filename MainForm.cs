@@ -21,12 +21,17 @@ namespace WebpToJpg
         private readonly Button reset = MakeButton("Reset");
         private readonly Label status = new Label { AutoSize = true, Anchor = AnchorStyles.Left };
         private readonly ProgressBar progress = new ProgressBar { Dock = DockStyle.Fill, Height = 8 };
+        private readonly ComboBox direction = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 142, AccessibleName = "Conversion direction" };
+        private readonly Label qualityLabel = new Label { AutoSize = true, Anchor = AnchorStyles.Left };
+        private ListViewItem[] otherQueue = new ListViewItem[0];
+        private bool ToWebp { get { return direction.SelectedIndex == 1; } }
+        private string InputName { get { return ToWebp ? "JPEG" : "WebP"; } }
         private string outputFolder;
         private bool busy;
 
         public MainForm()
         {
-            Text = "WebP → JPG";
+            Text = "WebP ↔ JPG";
             Icon = new Icon(typeof(MainForm), "WebpToJpg.ico");
             Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.Dpi;
@@ -43,10 +48,12 @@ namespace WebpToJpg
             for (int i = 0; i < layout.RowCount; i++)
                 layout.RowStyles.Add(new RowStyle(i == 2 ? SizeType.Percent : SizeType.AutoSize, i == 2 ? 100 : 0));
             Controls.Add(layout);
-            layout.Controls.Add(new Label { Text = "WebP → JPG", AutoSize = true,
+            layout.Controls.Add(new Label { Text = "WebP ↔ JPG", AutoSize = true,
                 Font = new Font(Font.FontFamily, 21, FontStyle.Bold) }, 0, 0);
             var toolbar = Flow();
-            toolbar.Controls.AddRange(new Control[] { add, clear });
+            direction.Items.AddRange(new object[] { "WebP → JPG", "JPG → WebP" });
+            direction.SelectedIndex = 0;
+            toolbar.Controls.AddRange(new Control[] { new Label { Text = "Direction", AutoSize = true, Anchor = AnchorStyles.Left }, direction, add, clear });
             layout.Controls.Add(toolbar, 0, 1);
 
             files.View = View.Details;
@@ -70,7 +77,7 @@ namespace WebpToJpg
             layout.Controls.Add(output, 0, 4);
 
             var settings = Flow();
-            settings.Controls.Add(new Label { Text = "JPEG quality (%)", AutoSize = true, Anchor = AnchorStyles.Left });
+            settings.Controls.Add(qualityLabel);
             settings.Controls.Add(quality);
             layout.Controls.Add(settings, 0, 5);
             layout.Controls.Add(progress, 0, 6);
@@ -84,9 +91,21 @@ namespace WebpToJpg
             footer.Controls.Add(start, 1, 0);
             layout.Controls.Add(footer, 0, 7);
 
+            direction.SelectedIndexChanged += delegate
+            {
+                var previous = files.Items.Cast<ListViewItem>().ToArray();
+                files.Items.Clear();
+                files.Items.AddRange(otherQueue);
+                paths.Clear();
+                paths.UnionWith(otherQueue.Select(row => (string)row.Tag));
+                otherQueue = previous;
+                progress.Value = 0;
+                RefreshControls();
+            };
             add.Click += delegate
             {
-                using (var picker = new OpenFileDialog { Title = "Select WebP files", Filter = "WebP images (*.webp)|*.webp", Multiselect = true })
+                using (var picker = new OpenFileDialog { Title = "Select " + InputName + " files",
+                    Filter = ToWebp ? "JPEG images (*.jpg;*.jpeg)|*.jpg;*.jpeg" : "WebP images (*.webp)|*.webp", Multiselect = true })
                     if (picker.ShowDialog(this) == DialogResult.OK) AddFiles(picker.FileNames);
             };
             DragEnter += (s, e) => e.Effect = !busy && e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
@@ -94,7 +113,7 @@ namespace WebpToJpg
             clear.Click += delegate { paths.Clear(); files.Items.Clear(); progress.Value = 0; RefreshControls(); };
             browse.Click += delegate
             {
-                using (var picker = new FolderBrowserDialog { Description = "Select an output folder for JPG files", SelectedPath = outputFolder ?? "" })
+                using (var picker = new FolderBrowserDialog { Description = "Select an output folder", SelectedPath = outputFolder ?? "" })
                     if (picker.ShowDialog(this) == DialogResult.OK) { outputFolder = picker.SelectedPath; RefreshControls(); }
             };
             reset.Click += delegate { outputFolder = null; RefreshControls(); };
@@ -115,8 +134,11 @@ namespace WebpToJpg
 
         private void AddFiles(IEnumerable<string> candidates)
         {
-            foreach (var file in candidates.Where(p => string.Equals(Path.GetExtension(p), ".webp", StringComparison.OrdinalIgnoreCase) && File.Exists(p)))
+            foreach (var file in candidates)
             {
+                string ext = Path.GetExtension(file).ToLowerInvariant();
+                bool supported = ToWebp ? ext == ".jpg" || ext == ".jpeg" : ext == ".webp";
+                if (!supported || !File.Exists(file)) continue;
                 if (!paths.Add(file)) continue;
                 var item = new ListViewItem(Path.GetFileName(file)) { Tag = file, ToolTipText = file };
                 item.SubItems.Add("Queued");
@@ -128,11 +150,13 @@ namespace WebpToJpg
         private void RefreshControls()
         {
             bool hasFiles = files.Items.Count > 0;
-            add.Enabled = browse.Enabled = quality.Enabled = !busy;
+            direction.Enabled = add.Enabled = browse.Enabled = quality.Enabled = !busy;
+            add.Text = "Add " + InputName + " files…";
+            qualityLabel.Text = (ToWebp ? "WebP" : "JPEG") + " quality (%)";
             start.Enabled = clear.Enabled = !busy && hasFiles;
             reset.Enabled = !busy && outputFolder != null;
             destination.Text = outputFolder ?? "Same folder as each source file";
-            status.Text = hasFiles ? "Files in list: " + files.Items.Count : "Add WebP files or drag them here.";
+            status.Text = hasFiles ? "Files in list: " + files.Items.Count : "Add " + InputName + " files or drag them here.";
         }
 
         private async Task RunBatch()
@@ -143,6 +167,7 @@ namespace WebpToJpg
             progress.Maximum = files.Items.Count;
             int errors = 0;
             int selectedQuality = (int)quality.Value;
+            bool toWebp = ToWebp;
             try
             {
                 foreach (ListViewItem item in files.Items)
@@ -154,7 +179,9 @@ namespace WebpToJpg
                     item.EnsureVisible();
                     try
                     {
-                        string result = await Task.Run(() => JpegConverter.ConvertFile(source, folder, selectedQuality));
+                        string result = await Task.Run(() => toWebp
+                            ? WebpConverter.ConvertFile(source, folder, selectedQuality)
+                            : JpegConverter.ConvertFile(source, folder, selectedQuality));
                         item.SubItems[1].Text = Path.GetFileName(result);
                         item.ToolTipText = result;
                         item.ForeColor = Color.DarkGreen;

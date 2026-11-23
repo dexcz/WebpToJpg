@@ -46,20 +46,24 @@ namespace WebpToJpg
                     pixels.DpiX, pixels.DpiY, PixelFormats.Bgr32, null, buffer, stride);
                 var encoder = new JpegBitmapEncoder { QualityLevel = quality };
                 encoder.Frames.Add(BitmapFrame.Create(opaque));
-                return SaveNew(encoder, folder, Path.GetFileNameWithoutExtension(source));
+                return ConversionOutput.Save(folder, Path.GetFileNameWithoutExtension(source), ".jpg", encoder.Save);
             }
         }
 
-        private static string SaveNew(JpegBitmapEncoder encoder, string folder, string name)
+    }
+
+    internal static class ConversionOutput
+    {
+        public static string Save(string folder, string name, string extension, Action<Stream> encode)
         {
             string temp = Path.Combine(folder, Guid.NewGuid().ToString("N") + ".tmp");
             var output = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None);
             try
             {
-                using (output) { encoder.Save(output); }
+                using (output) { encode(output); }
                 for (int n = 0; ; n++)
                 {
-                    string file = n == 0 ? name + ".jpg" : string.Format("{0} ({1}).jpg", name, n);
+                    string file = n == 0 ? name + extension : string.Format("{0} ({1}){2}", name, n, extension);
                     string target = Path.Combine(folder, file);
                     try { File.Move(temp, target); return target; }
                     catch (IOException) when (File.Exists(target) || Directory.Exists(target)) { }
